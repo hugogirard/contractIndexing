@@ -16,10 +16,14 @@ var suffix = uniqueString(rg.id)
 module doc 'br/public:avm/res/cognitive-services/account:0.13.2' = {
   scope: rg
   params: {
+    tags: {
+      SecurityControl: 'Ignore'
+    }
     name: 'doc-${suffix}'
     kind: 'FormRecognizer'
     location: location
     sku: 'S0'
+    disableLocalAuth: false
   }
 }
 
@@ -47,6 +51,7 @@ module aisearch 'br/public:avm/res/search/search-service:0.11.1' = {
       }
     }
     publicNetworkAccess: 'Enabled'
+    disableLocalAuth: false
     partitionCount: 1
     replicaCount: 1
     sku: 'standard'
