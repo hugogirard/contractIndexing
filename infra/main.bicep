@@ -22,3 +22,38 @@ module doc 'br/public:avm/res/cognitive-services/account:0.13.2' = {
     sku: 'S0'
   }
 }
+
+module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
+  scope: rg
+  params: {
+    tags: {
+      SecurityControl: 'Ignore'
+    }
+    name: 'str${replace(suffix,'-','')}'
+    kind: 'StorageV2'
+    location: location
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+module aisearch 'br/public:avm/res/search/search-service:0.11.1' = {
+  scope: rg
+  params: {
+    name: 'search-${suffix}'
+    location: location
+    authOptions: {
+      aadOrApiKey: {
+        aadAuthFailureMode: 'http401WithBearerChallenge'
+      }
+    }
+    publicNetworkAccess: 'Enabled'
+    partitionCount: 1
+    replicaCount: 1
+    sku: 'standard'
+  }
+}
+
+output docIntelligenceResourceName string = doc.outputs.name
+output docIntelligenceEndpoint string = doc.outputs.endpoint
+output storageAccountName string = storage.outputs.name
+output aiSearchResourceName string = aisearch.outputs.name
