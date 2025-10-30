@@ -1,0 +1,17 @@
+@rootUrl=http://localhost:7071
+@fileName=purchaseOrderFive.pdf
+
+POST {{rootUrl}}/api/process
+Content-Type: application/json
+
+{
+    "values": [
+        {
+            "recordId": "1",
+            "data": {
+              "metadata_storage_name": "{{fileName}}"
+            }
+        }
+    ]
+    
+}
