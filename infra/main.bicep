@@ -40,6 +40,13 @@ module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
     kind: 'StorageV2'
     location: location
     publicNetworkAccess: 'Enabled'
+    blobServices: {
+      containers: [
+        {
+          name: 'documents'
+        }
+      ]
+    }
   }
 }
 
@@ -74,6 +81,7 @@ module doc_intelligence_storage_reader 'br/public:avm/ptn/authorization/resource
   scope: rg
   name: 'doc_intelligence_storage_reader'
   params: {
+    #disable-next-line BCP321 use-safe-access
     principalId: doc.outputs.systemAssignedMIPrincipalId
     resourceId: storage.outputs.resourceId
     roleDefinitionId: storageBlobDataReader.id
