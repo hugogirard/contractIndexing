@@ -2,8 +2,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 
 class Jurisdiction(BaseModel):
-    region:Optional[str]
-    clause:Optional[str]
+    region:Optional[str] = None
+    clause:Optional[str] = None
 
 # Extracted from Document Intelligence
 class ContractFields(BaseModel):

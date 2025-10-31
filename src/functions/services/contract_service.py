@@ -40,43 +40,45 @@ class ContractService:
             contract = await poller.result()
 
             doc = contract.documents[0]
-            
+
             if doc.doc_type:
                 contract_fields.doc_type = doc.doc_type
 
             title = doc.fields.get("Title")
             if title:
-                contract_fields.title = title
+                contract_fields.title = title.value_string
 
             effective_date = doc.fields.get("EffectiveDate")
             if effective_date:
-                contract_fields.effective_date = effective_date
+                contract_fields.effective_date = effective_date.value_string
 
             parties = doc.fields.get("Parties")
             if parties:
-               contract_parties:List[str] = []
-               for party_idx, party in enumerate(parties.value_array):
-                   contract_parties.append(party.value_string)
-               contract_fields.parties = contract_parties
+                contract_parties:List[str] = []
+                for party_idx, party in enumerate(parties.value_array):
+                    contract_parties.append(party.value_string)
+                contract_fields.parties = contract_parties
 
             jurisdictions = doc.fields.get("Jurisdictions")
             if jurisdictions:
-               jurisdictions:List[Jurisdiction] = []
-               for jurisdiction_idx, jurisdiction in enumerate(jurisdictions.value_array):
-                   
-                   jurisdiction = Jurisdiction()
-                   
-                   region = jurisdiction.value_object.get("Region")
-                   if region:
-                       jurisdiction.region = region
+                contract_jurisdictions:List[Jurisdiction] = []
+                for jurisdiction_idx, jurisdiction in enumerate(jurisdictions.value_array):
+                    
+                    contract_jurisdiction = Jurisdiction()
+                    
+                    region = jurisdiction.value_object.get("Region")
+                    if region:
+                        contract_jurisdiction.region = region.value_string
 
-                   clause = jurisdiction.value_object.get("Clause")
-                   if clause:
-                       jurisdiction.clause = clause
-                   
-                   jurisdictions.append(jurisdiction)
-               
-               contract_fields.jurisdictions = jurisdictions
+                    clause = jurisdiction.value_object.get("Clause")
+                    if clause:
+                        contract_jurisdiction.clause = clause.value_string
+                    
+                    contract_jurisdictions.append(contract_jurisdiction)
+                
+                contract_fields.jurisdictions = contract_jurisdictions
+
+            return contract_fields
                       
         except Exception as ex:
             logging.error(ex)
