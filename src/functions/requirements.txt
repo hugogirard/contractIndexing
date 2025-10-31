@@ -4,3 +4,7 @@
 
 azure-functions
 pydantic
+azure-storage-blob
+aiohttp
+azure-identity
+azure-ai-documentintelligence

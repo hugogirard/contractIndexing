@@ -16,6 +16,9 @@ var suffix = uniqueString(rg.id)
 module doc 'br/public:avm/res/cognitive-services/account:0.13.2' = {
   scope: rg
   params: {
+    managedIdentities: {
+      systemAssigned: true
+    }
     tags: {
       SecurityControl: 'Ignore'
     }
@@ -55,6 +58,25 @@ module aisearch 'br/public:avm/res/search/search-service:0.11.1' = {
     partitionCount: 1
     replicaCount: 1
     sku: 'standard'
+  }
+}
+
+// RBAC
+
+@description('Built-in Role: [Storage Blob Data Reader]')
+resource storageBlobDataReader 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: '2a2b9908-6ea1-4ae2-8e65-a410df84e7d1'
+  scope: subscription()
+}
+
+// Give Document Intelligence access reader of the Blob Storage
+module doc_intelligence_storage_reader 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
+  scope: rg
+  name: 'doc_intelligence_storage_reader'
+  params: {
+    principalId: doc.outputs.systemAssignedMIPrincipalId
+    resourceId: storage.outputs.resourceId
+    roleDefinitionId: storageBlobDataReader.id
   }
 }
 
