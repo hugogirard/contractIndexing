@@ -23,6 +23,7 @@ module doc 'br/public:avm/res/cognitive-services/account:0.13.2' = {
       SecurityControl: 'Ignore'
     }
     name: 'doc-${suffix}'
+    customSubDomainName: 'doc-${suffix}'
     kind: 'FormRecognizer'
     location: location
     sku: 'S0'

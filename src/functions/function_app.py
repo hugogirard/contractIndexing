@@ -20,11 +20,11 @@ async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
     try:
         req_body = req.get_json()
         document_request = DocumentRequest(**req_body)
-        document_output = DocumentOutput()
+        document_output = DocumentOutput(values=[])
 
-        for doc in document_request.values:
-            contract:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
-            document_output.values.append(contract)
+        # for doc in document_request.values:
+        #     contract:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
+        #     document_output.values.append(contract)
             
     except ValueError as ex:
         logging.error(ex)
@@ -33,6 +33,6 @@ async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
         return func.HttpResponse(f"Invalid request format: {str(e)}", status_code=400)
 
     return func.HttpResponse(
-            json.dump(document_output,indent=4),
+            document_output.model_dump_json(indent=4),
             status_code=200
     )
