@@ -1,1 +1,1 @@
-from .contract import ContractFields, Contract, Message
+from .contract import ContractFields, Contract, Message, Jurisdiction

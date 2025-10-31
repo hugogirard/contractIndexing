@@ -1,1 +1,2 @@
 from .document_request import DocumentRequest
+from .document_output import DocumentOutput

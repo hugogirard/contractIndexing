@@ -1,20 +1,27 @@
 from azure.functions import HttpMethod
 from request import DocumentRequest
 from pydantic import ValidationError
+from services.contract_service import ContractService
+from models import ContractFields
 import azure.functions as func
 import logging
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
+contract_service = ContractService()
+
 @app.function_name(name="process_contract")
 @app.route(route="process",methods=[HttpMethod.POST])
-def process_contract(req: func.HttpRequest) -> func.HttpResponse:
+async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
 
     try:
         req_body = req.get_json()
         document_request = DocumentRequest(**req_body)
+
+        for doc in document_request.values:
+            contract:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
         
     except ValueError as ex:
         logging.error(ex)
