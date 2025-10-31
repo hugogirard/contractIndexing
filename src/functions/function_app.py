@@ -22,9 +22,9 @@ async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
         document_request = DocumentRequest(**req_body)
         document_output = DocumentOutput(values=[])
 
-        # for doc in document_request.values:
-        #     contract:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
-        #     document_output.values.append(contract)
+        for doc in document_request.values:
+            contract:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
+            document_output.values.append(contract)
             
     except ValueError as ex:
         logging.error(ex)

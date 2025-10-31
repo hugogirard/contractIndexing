@@ -14,8 +14,8 @@ class ContractService:
             endpoint=os.getenv('DOC_ENDPOINT'),
             credential=AzureKeyCredential(os.getenv('DOC_API_KEY'))
         )
-        # self.account_name = os.getenv('BLOB_ACCOUNT_URL')
-        # self.container_name = os.getenv('CONTAINER_NAME')
+        self.account_name = os.getenv('BLOB_ACCOUNT_URL')
+        self.container_name = os.getenv('CONTAINER_NAME')
         #self.blob_service_client = BlobServiceClient(account_url=self.account_name,credential=DefaultAzureCredential())
 
     async def analyze_contract(self,file_name:str) -> ContractFields:

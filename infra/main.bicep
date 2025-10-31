@@ -28,6 +28,7 @@ module doc 'br/public:avm/res/cognitive-services/account:0.13.2' = {
     location: location
     sku: 'S0'
     disableLocalAuth: false
+    publicNetworkAccess: 'Enabled'
   }
 }
 
