@@ -6,9 +6,6 @@ param location string
 @description('The resource group name')
 param rgName string
 
-@description('Id of the user running this template, to be used for testing and debugging for access to Azure resources. This is not required in production. Leave empty if not needed.')
-param principalId string = ''
-
 resource rg 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   name: rgName
   location: location
@@ -134,7 +131,7 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
       deployment: {
         storage: {
           type: 'blobContainer'
-          value: '${storage.outputs.primaryBlobEndpoint}${deploymentStorageContainerName}'
+          value: '${storageFunction.outputs.primaryBlobEndpoint}${deploymentStorageContainerName}'
           authentication: {
             type: 'UserAssignedIdentity'
             userAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
@@ -160,9 +157,9 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
           // Only include required credential settings unconditionally
           AzureWebJobsStorage__clientId: userAssignedIdentity.outputs.clientId
           AzureWebJobsStorage__credential: 'managedidentity'
-          AzureWebJobsStorage__blobServiceUri: 'https://${storage.outputs.name}.blob.${environment().suffixes.storage}'
-          AzureWebJobsStorage__queueServiceUri: 'https://${storage.outputs.name}.queue.${environment().suffixes.storage}'
-          AzureWebJobsStorage__tableServiceUri: 'https://${storage.outputs.name}.table.${environment().suffixes.storage}'
+          AzureWebJobsStorage__blobServiceUri: 'https://${storageFunction.outputs.name}.blob.${environment().suffixes.storage}'
+          AzureWebJobsStorage__queueServiceUri: 'https://${storageFunction.outputs.name}.queue.${environment().suffixes.storage}'
+          AzureWebJobsStorage__tableServiceUri: 'https://${storageFunction.outputs.name}.table.${environment().suffixes.storage}'
 
           // Application Insights settings are always included
           APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.outputs.connectionString
