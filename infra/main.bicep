@@ -234,3 +234,5 @@ module doc_aiSearch_storage_contributor 'br/public:avm/ptn/authorization/resourc
     roleDefinitionId: storageBlobDataContributor.id
   }
 }
+
+output functionAppName string = functionApp.outputs.name

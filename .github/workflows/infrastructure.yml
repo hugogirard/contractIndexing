@@ -38,11 +38,11 @@ jobs:
                   template: ./infra/main.bicep
                   parameters: ./infra/main.bicepparam
 
-        #   - uses: gliech/create-github-secret-action@v1
-        #     with:
-        #       name: STORATE_RESOURCE_NAME
-        #       value: ${{ steps.createResources.outputs.storageResourceName }}
-        #       pa_token: ${{ secrets.PA_TOKEN }}
+            - uses: gliech/create-github-secret-action@v1
+              with:
+                  name: FUNCTION_APP_NAME
+                  value: ${{ steps.createResources.outputs.functionAppName }}
+                  pa_token: ${{ secrets.PA_TOKEN }}
 
         #   - uses: gliech/create-github-secret-action@v1
         #     with:
