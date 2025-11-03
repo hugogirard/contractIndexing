@@ -11,8 +11,7 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
 contract_service = ContractService()
 
-@app.function_name(name="process_contract")
-@app.route(route="process",methods=[HttpMethod.POST])
+@app.route(route="process", methods=[HttpMethod.POST])
 async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('Python HTTP trigger function processed a request.')
 
@@ -47,6 +46,7 @@ async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
 
             
         return func.HttpResponse(document_output.model_dump_json(indent=4, by_alias=True),
+                                 mimetype="application/json",
                                  status_code=200)
 
     except ValueError as ex:

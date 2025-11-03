@@ -13,22 +13,11 @@ resource rg 'Microsoft.Resources/resourceGroups@2025-04-01' = {
 
 var suffix = uniqueString(rg.id)
 
-module doc 'br/public:avm/res/cognitive-services/account:0.13.2' = {
+module doc 'modules/docIntelligence.bicep' = {
   scope: rg
   params: {
-    managedIdentities: {
-      systemAssigned: true
-    }
-    tags: {
-      SecurityControl: 'Ignore'
-    }
-    name: 'doc-${suffix}'
-    customSubDomainName: 'doc-${suffix}'
-    kind: 'FormRecognizer'
     location: location
-    sku: 'S0'
-    disableLocalAuth: false
-    publicNetworkAccess: 'Enabled'
+    suffix: suffix
   }
 }
 
@@ -49,6 +38,14 @@ module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
         }
       ]
     }
+  }
+}
+
+module function 'modules/functions.bicep' = {
+  scope: rg
+  params: {
+    location: location
+    suffix: suffix
   }
 }
 
@@ -78,6 +75,12 @@ resource storageBlobDataReader 'Microsoft.Authorization/roleDefinitions@2022-04-
   scope: subscription()
 }
 
+@description('Built-in Role: [Storage Blob Data Contributor]')
+resource storageBlobDataContributor 'Microsoft.Authorization/roleDefinitions@2022-04-01' existing = {
+  name: 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+  scope: subscription()
+}
+
 // Give Document Intelligence access reader of the Blob Storage
 module doc_intelligence_storage_reader 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
   scope: rg
@@ -90,7 +93,13 @@ module doc_intelligence_storage_reader 'br/public:avm/ptn/authorization/resource
   }
 }
 
-output docIntelligenceResourceName string = doc.outputs.name
-output docIntelligenceEndpoint string = doc.outputs.endpoint
-output storageAccountName string = storage.outputs.name
-output aiSearchResourceName string = aisearch.outputs.name
+module doc_aiSearch_storage_contributor 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = {
+  scope: rg
+  name: 'aisearch_storage_contributor'
+  params: {
+    #disable-next-line BCP321 use-safe-access
+    principalId: aisearch.outputs.systemAssignedMIPrincipalId
+    resourceId: storage.outputs.resourceId
+    roleDefinitionId: storageBlobDataContributor.id
+  }
+}

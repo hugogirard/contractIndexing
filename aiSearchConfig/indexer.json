@@ -1,0 +1,58 @@
+{
+    "name": "indexercontract",
+    "dataSourceName": "dtidx",
+    "targetIndexName": "contract",
+    "parameters": {
+        "maxFailedItems": 10,
+        "maxFailedItemsPerBatch": 5,
+        "configuration": {
+            "dataToExtract": "storageMetadata"
+        }
+    },
+    "schedule": {
+        "interval": "PT1H"
+    },
+    "skillsetName": "contractskillset",
+    "outputFieldMappings": [
+        {
+            "sourceFieldName": "/document/do-docType",
+            "targetFieldName": "docType"
+        },
+        {
+            "sourceFieldName": "/document/do-title",
+            "targetFieldName": "title"
+        },
+        {
+            "sourceFieldName": "/document/do-contractId",
+            "targetFieldName": "contractId"
+        },
+        {
+            "sourceFieldName": "/document/do-parties",
+            "targetFieldName": "parties"
+        },
+        {
+            "sourceFieldName": "/document/do-executionDate",
+            "targetFieldName": "executionDate"
+        },
+        {
+            "sourceFieldName": "/document/do-effectiveDate",
+            "targetFieldName": "effectiveDate"
+        },
+        {
+            "sourceFieldName": "/document/do-expirationDate",
+            "targetFieldName": "expirationDate"
+        },
+        {
+            "sourceFieldName": "/document/do-contractDuration",
+            "targetFieldName": "contractDuration"
+        },
+        {
+            "sourceFieldName": "/document/do-renewalDate",
+            "targetFieldName": "renewalDate"
+        },
+        {
+            "sourceFieldName": "/document/do-jurisdictions",
+            "targetFieldName": "jurisdictions"
+        }
+    ]
+}

@@ -85,23 +85,34 @@ CONTRACT_TYPES = [
 
 
 def generate_contract_dates():
-    """Generate random contract effective and expiration dates"""
-    # Effective date within the last 3 years
+    """Generate random contract dates: execution, effective, expiration, and renewal"""
+    # Execution date (when contract was signed) - within the last 3 years
     days_ago = random.randint(0, 1095)
-    effective_date = datetime.now() - timedelta(days=days_ago)
+    execution_date = datetime.now() - timedelta(days=days_ago)
     
-    # Expiration date: 12, 24, or 36 months from effective date
+    # Effective date: 0-30 days after execution
+    days_after_execution = random.randint(0, 30)
+    effective_date = execution_date + timedelta(days=days_after_execution)
+    
+    # Contract duration: 12, 24, or 36 months
     contract_duration_months = random.choice([12, 24, 36])
+    
+    # Expiration date: calculated from effective date
     expiration_date = effective_date + timedelta(days=contract_duration_months * 30)
     
-    return effective_date, expiration_date, contract_duration_months
+    # Renewal date: 30-90 days before expiration
+    days_before_expiration = random.randint(30, 90)
+    renewal_date = expiration_date - timedelta(days=days_before_expiration)
+    
+    return execution_date, effective_date, expiration_date, renewal_date, contract_duration_months
 
 
-def create_contract_pdf(filename, company, vendor, contract_type, effective_date, expiration_date, contract_duration):
+def create_contract_pdf(filename, company, vendor, contract_type, effective_date, expiration_date, 
+                       execution_date, renewal_date, contract_duration, contract_id):
     """Generate a PDF contract with all required fields"""
     doc = SimpleDocTemplate(filename, pagesize=letter,
-                          rightMargin=0.75*inch, leftMargin=0.75*inch,
-                          topMargin=0.75*inch, bottomMargin=0.75*inch)
+                          rightMargin=0.5*inch, leftMargin=0.5*inch,
+                          topMargin=0.5*inch, bottomMargin=0.5*inch)
     
     # Container for the 'Flowable' objects
     elements = []
@@ -117,75 +128,86 @@ def create_contract_pdf(filename, company, vendor, contract_type, effective_date
     title_style = ParagraphStyle(
         'CustomTitle',
         parent=styles['Heading1'],
-        fontSize=16,
+        fontSize=13,
         textColor=colors.white,
-        spaceAfter=20,
+        spaceAfter=8,
         alignment=TA_CENTER,
         fontName='Helvetica-Bold',
         backColor=primary_color,
-        borderPadding=(10, 10, 10, 10)
+        borderPadding=(8, 8, 8, 8)
     )
     
     body_style = ParagraphStyle(
         'CustomBody',
         parent=styles['BodyText'],
-        fontSize=10,
+        fontSize=9,
         alignment=TA_JUSTIFY,
-        spaceAfter=12,
-        leading=14,
+        spaceAfter=6,
+        leading=11,
         textColor=colors.HexColor('#1F2937')
     )
     
     signature_style = ParagraphStyle(
         'Signature',
         parent=styles['BodyText'],
-        fontSize=10,
-        spaceAfter=6,
+        fontSize=9,
+        spaceAfter=4,
         textColor=colors.HexColor('#374151')
     )
     
     section_header_style = ParagraphStyle(
         'SectionHeader',
         parent=styles['Heading2'],
-        fontSize=11,
+        fontSize=10,
         textColor=primary_color,
-        spaceAfter=10,
-        spaceBefore=10,
+        spaceAfter=6,
+        spaceBefore=6,
         fontName='Helvetica-Bold'
     )
     
     # Title with colored background
     title_text = f'<para align="center" backColor="{primary_color.hexval()}" ' \
-                 f'textColor="white" spaceAfter="10" spaceBefore="10">' \
+                 f'textColor="white" spaceAfter="6" spaceBefore="6">' \
                  f'<b>{contract_type["title"]}</b></para>'
     title = Paragraph(title_text, title_style)
     elements.append(title)
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Contract ID header (small, subtle)
+    contract_id_text = f'<para align="right"><font size="7" color="{primary_color.hexval()}">Contract ID: {contract_id}</font></para>'
+    elements.append(Paragraph(contract_id_text, body_style))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Introduction paragraph with proper party structure and colored highlights
     effective_date_str = effective_date.strftime("%d day of %B, %Y")
-    intro_text = f"""This {contract_type["title"].title()} is entered as of the <font color="{highlight_color.hexval()}"><b>{effective_date_str}</b></font> 
+    execution_date_str = execution_date.strftime("%B %d, %Y")
+    
+    intro_text = f"""This {contract_type["title"].title()} is executed on <font color="{highlight_color.hexval()}"><b>{execution_date_str}</b></font> 
+    and entered into effect as of the <font color="{highlight_color.hexval()}"><b>{effective_date_str}</b></font> 
     ("<b>Effective Date</b>") by and between <font color="{primary_color.hexval()}"><b>{company['name']}</b></font>, a Washington corporation, 
     having its principal place of business at {company['address']} ("<b>{company['reference']}</b>") 
     and <font color="{primary_color.hexval()}"><b>{vendor['name']}</b></font>, a Washington corporation, having its principal place of business at 
     {vendor['address']} ("<b>{vendor['reference']}</b>")."""
     
     elements.append(Paragraph(intro_text, body_style))
-    elements.append(Spacer(1, 0.15*inch))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Contract term and expiration with colored highlights
     expiration_date_str = expiration_date.strftime("%B %d, %Y")
+    renewal_date_str = renewal_date.strftime("%B %d, %Y")
+    
     term_text = f"""This agreement shall remain in effect for a period of <font color="{accent_color.hexval()}"><b>{contract_duration} months</b></font> 
     from the Effective Date and shall expire on <font color="{highlight_color.hexval()}"><b>{expiration_date_str}</b></font> unless terminated earlier 
-    in accordance with the terms set forth herein."""
+    in accordance with the terms set forth herein. The contract is eligible for renewal on or before 
+    <font color="{accent_color.hexval()}"><b>{renewal_date_str}</b></font>."""
     elements.append(Paragraph(term_text, body_style))
-    elements.append(Spacer(1, 0.15*inch))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Terms paragraph
     terms_text = f"""This agreement shall void and nullify any and all previous agreements to this 
     date between <font color="{primary_color.hexval()}"><b>{company['reference']}</b></font> and <font color="{primary_color.hexval()}"><b>{vendor['reference']}</b></font>."""
     elements.append(Paragraph(terms_text, body_style))
-    elements.append(Spacer(1, 0.15*inch))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Generate dynamic contract terms
     access_limit = random.randint(200000, 600000)
@@ -201,7 +223,7 @@ def create_contract_pdf(filename, company, vendor, contract_type, effective_date
     <font color="{primary_color.hexval()}"><b>{company['reference']}</b></font> by no later than Wednesday for accesses used from the previous week 
     (Monday thru Sunday)."""
     elements.append(Paragraph(fees_text, body_style))
-    elements.append(Spacer(1, 0.15*inch))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Support paragraph with colored highlights
     support_text = f"""<font color="{primary_color.hexval()}"><b>{company['reference']}</b></font> must provide a person(s) to correct any technical 
@@ -209,18 +231,18 @@ def create_contract_pdf(filename, company, vendor, contract_type, effective_date
     This person(s) must be available by beeper or telephone. <font color="{primary_color.hexval()}"><b>{vendor['reference']}</b></font> shall provide 
     this same 24 hour support at the broadcast location."""
     elements.append(Paragraph(support_text, body_style))
-    elements.append(Spacer(1, 0.15*inch))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Governing law paragraph - Jurisdictions section with colored text
     gov_text = f"""<font color="{primary_color.hexval()}"><b>Governing Law:</b></font> {contract_type["jurisdiction_clause"]}"""
     elements.append(Paragraph(gov_text, body_style))
-    elements.append(Spacer(1, 0.15*inch))
+    elements.append(Spacer(1, 0.08*inch))
     
     # Final agreement paragraph
     final_text = f"""All parties have read and fully agree to all terms and conditions as set forth 
     in this <font color="{accent_color.hexval()}"><b>{contract_type["title"].title()}</b></font>."""
     elements.append(Paragraph(final_text, body_style))
-    elements.append(Spacer(1, 0.3*inch))
+    elements.append(Spacer(1, 0.15*inch))
     
     # Signature section with proper party names and colored styling
     sig_data = [
@@ -234,12 +256,12 @@ def create_contract_pdf(filename, company, vendor, contract_type, effective_date
          Paragraph(f'<font name="Courier" color="{accent_color.hexval()}">{vendor["rep"]}</font>', signature_style)],
     ]
     
-    sig_table = Table(sig_data, colWidths=[3.25*inch, 3.25*inch])
+    sig_table = Table(sig_data, colWidths=[3.5*inch, 3.5*inch])
     sig_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
         ('LINEABOVE', (0, 3), (-1, 3), 1, primary_color),  # Signature line
-        ('TOPPADDING', (0, 3), (-1, 3), 10),
+        ('TOPPADDING', (0, 3), (-1, 3), 6),
     ]))
     
     elements.append(sig_table)
@@ -248,30 +270,33 @@ def create_contract_pdf(filename, company, vendor, contract_type, effective_date
     doc.build(elements)
     print(f"Generated: {filename}")
     
-    # Return contract metadata for logging
+    # Return contract metadata for logging (matching Azure Search schema)
     return {
         "filename": filename,
+        "id": contract_id,
+        "docType": "contract",
         "title": contract_type["title"],
-        "type": contract_type["type"],
-        "effective_date": effective_date.strftime("%Y-%m-%d"),
-        "expiration_date": expiration_date.strftime("%Y-%m-%d"),
+        "contractId": contract_id,
+        "executionDate": execution_date.strftime("%Y-%m-%d"),
+        "effectiveDate": effective_date.strftime("%Y-%m-%d"),
+        "expirationDate": expiration_date.strftime("%Y-%m-%d"),
+        "contractDuration": f"{contract_duration} months",
+        "renewalDate": renewal_date.strftime("%Y-%m-%d"),
         "parties": [
             {
                 "name": company['name'],
                 "address": company['address'],
-                "reference": company['reference'],
-                "representative": company['rep'],
-                "title": company['title']
+                "referenceName": company['reference'],
+                "clause": f"{company['name']}, a Washington corporation, having its principal place of business at {company['address']} (\"{company['reference']}\")"
             },
             {
                 "name": vendor['name'],
                 "address": vendor['address'],
-                "reference": vendor['reference'],
-                "representative": vendor['rep'],
-                "title": vendor['title']
+                "referenceName": vendor['reference'],
+                "clause": f"{vendor['name']}, a Washington corporation, having its principal place of business at {vendor['address']} (\"{vendor['reference']}\")"
             }
         ],
-        "jurisdiction": contract_type["jurisdiction_region"]
+        "jurisdictions": [contract_type["jurisdiction_region"]]
     }
 
 
@@ -299,7 +324,10 @@ def main():
             vendor = random.choice(VENDORS)
         
         contract_type = CONTRACT_TYPES[i % len(CONTRACT_TYPES)]
-        effective_date, expiration_date, contract_duration = generate_contract_dates()
+        execution_date, effective_date, expiration_date, renewal_date, contract_duration = generate_contract_dates()
+        
+        # Generate unique contract ID
+        contract_id = f"CTR-{contract_type['type'].upper()}-{effective_date.strftime('%Y%m%d')}-{random.randint(1000, 9999)}"
         
         # Generate filename with contract type
         filename = os.path.join(
@@ -310,26 +338,33 @@ def main():
         # Create the contract and get metadata
         metadata = create_contract_pdf(
             filename, company, vendor, contract_type, 
-            effective_date, expiration_date, contract_duration
+            effective_date, expiration_date, execution_date, renewal_date, 
+            contract_duration, contract_id
         )
         contracts_metadata.append(metadata)
         
         # Print contract summary
         print(f"\nContract #{i+1}:")
-        print(f"  Type: {metadata['type']} - {metadata['title']}")
-        print(f"  Effective: {metadata['effective_date']}")
-        print(f"  Expires: {metadata['expiration_date']}")
-        print(f"  Party 1: {metadata['parties'][0]['name']} ({metadata['parties'][0]['reference']})")
-        print(f"  Party 2: {metadata['parties'][1]['name']} ({metadata['parties'][1]['reference']})")
-        print(f"  Jurisdiction: {metadata['jurisdiction']}")
+        print(f"  ID: {metadata['contractId']}")
+        print(f"  DocType: {metadata['docType']}")
+        print(f"  Title: {metadata['title']}")
+        print(f"  Execution Date: {metadata['executionDate']}")
+        print(f"  Effective Date: {metadata['effectiveDate']}")
+        print(f"  Expiration Date: {metadata['expirationDate']}")
+        print(f"  Renewal Date: {metadata['renewalDate']}")
+        print(f"  Duration: {metadata['contractDuration']}")
+        print(f"  Party 1: {metadata['parties'][0]['name']} ({metadata['parties'][0]['referenceName']})")
+        print(f"  Party 2: {metadata['parties'][1]['name']} ({metadata['parties'][1]['referenceName']})")
+        print(f"  Jurisdictions: {', '.join(metadata['jurisdictions'])}")
     
     print("\n" + "=" * 60)
     print(f"Successfully generated {num_contracts} contracts in '{output_dir}' directory!")
     print("\nContract Type Summary:")
     type_counts = {}
     for metadata in contracts_metadata:
-        contract_type = metadata['type']
-        type_counts[contract_type] = type_counts.get(contract_type, 0) + 1
+        # Extract type from title
+        contract_title = metadata['title']
+        type_counts[contract_title] = type_counts.get(contract_title, 0) + 1
     
     for ctype, count in sorted(type_counts.items()):
         print(f"  {ctype}: {count} contract(s)")

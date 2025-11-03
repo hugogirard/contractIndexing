@@ -1,0 +1,18 @@
+{
+    "name": "dtidx",
+    "description": null,
+    "type": "azureblob",
+    "subtype": null,
+    "indexerPermissionOptions": [],
+    "credentials": {
+        "connectionString": "ResourceId=/subscriptions/6e37307e-394c-478a-8404-4e441b3dfc1d/resourceGroups/rg-contract-analyzer/providers/Microsoft.Storage/storageAccounts/str6faovzmj7ajug;"
+    },
+    "container": {
+        "name": "documents",
+        "query": null
+    },
+    "dataChangeDetectionPolicy": null,
+    "dataDeletionDetectionPolicy": null,
+    "encryptionKey": null,
+    "identity": null
+}
