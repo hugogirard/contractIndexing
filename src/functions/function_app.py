@@ -37,6 +37,7 @@ async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
                 # Keeping the document in errors
                 contract = Contract(
                     recordId=doc.recordId,
+                    data=ContractFields(),
                     errors=Message(
                         message=str(ex)
                     )
