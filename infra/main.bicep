@@ -53,6 +53,9 @@ module aisearch 'br/public:avm/res/search/search-service:0.11.1' = {
   scope: rg
   params: {
     name: 'search-${suffix}'
+    managedIdentities: {
+      systemAssigned: true
+    }
     location: location
     authOptions: {
       aadOrApiKey: {
