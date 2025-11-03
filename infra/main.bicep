@@ -6,6 +6,9 @@ param location string
 @description('The resource group name')
 param rgName string
 
+@description('Id of the user running this template, to be used for testing and debugging for access to Azure resources. This is not required in production. Leave empty if not needed.')
+param principalId string = ''
+
 resource rg 'Microsoft.Resources/resourceGroups@2025-04-01' = {
   name: rgName
   location: location
@@ -41,13 +44,138 @@ module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
   }
 }
 
-module function 'modules/functions.bicep' = {
+// Functions and dependencies
+
+var functionAppName = 'funcskill-${suffix}'
+var deploymentStorageContainerName = 'app-package-${take(functionAppName, 32)}-${take(suffix, 7)}'
+
+module logAnalytics 'br/public:avm/res/operational-insights/workspace:0.11.1' = {
   scope: rg
   params: {
+    name: 'log-${suffix}'
     location: location
-    suffix: suffix
+    dataRetention: 30
   }
 }
+
+module applicationInsights 'br/public:avm/res/insights/component:0.6.0' = {
+  name: '${uniqueString(deployment().name, location)}-appinsights'
+  scope: rg
+  params: {
+    name: 'appli-${suffix}'
+    location: location
+    workspaceResourceId: logAnalytics.outputs.resourceId
+    disableLocalAuth: true
+  }
+}
+
+module storageFunction 'br/public:avm/res/storage/storage-account:0.25.0' = {
+  name: 'storage'
+  scope: rg
+  params: {
+    name: 'strf${replace(suffix,'-','')}'
+    allowBlobPublicAccess: false
+    allowSharedKeyAccess: false
+    dnsEndpointType: 'Standard'
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+      bypass: 'AzureServices'
+    }
+    blobServices: {
+      containers: [{ name: deploymentStorageContainerName }]
+    }
+    tableServices: {}
+    queueServices: {}
+    minimumTlsVersion: 'TLS1_2' // Enforcing TLS 1.2 for better security
+    location: location
+    tags: {
+      SecurityControl: 'Ignore'
+    }
+  }
+}
+
+module appServicePlan 'br/public:avm/res/web/serverfarm:0.1.1' = {
+  name: 'appserviceplan'
+  scope: rg
+  params: {
+    name: 'asp-${suffix}'
+    sku: {
+      name: 'FC1'
+      tier: 'FlexConsumption'
+    }
+    reserved: true
+    location: location
+    zoneRedundant: false
+  }
+}
+
+module functionApp 'br/public:avm/res/web/site:0.16.0' = {
+  name: 'functionapp'
+  scope: rg
+  params: {
+    kind: 'functionapp,linux'
+    name: functionAppName
+    location: location
+    serverFarmResourceId: appServicePlan.outputs.resourceId
+    managedIdentities: {
+      systemAssigned: true
+    }
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${storage.outputs.primaryBlobEndpoint}${deploymentStorageContainerName}'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 100
+        instanceMemoryMB: 2048
+      }
+      runtime: {
+        name: 'python'
+        version: '3.11'
+      }
+    }
+    siteConfig: {
+      alwaysOn: false
+    }
+    configs: [
+      {
+        name: 'appsettings'
+        properties: {
+          // Only include required credential settings unconditionally
+          AzureWebJobsStorage__credential: 'managedidentity'
+          AzureWebJobsStorage__blobServiceUri: 'https://${storage.outputs.name}.blob.${environment().suffixes.storage}'
+          AzureWebJobsStorage__queueServiceUri: 'https://${storage.outputs.name}.queue.${environment().suffixes.storage}'
+          AzureWebJobsStorage__tableServiceUri: 'https://${storage.outputs.name}.table.${environment().suffixes.storage}'
+
+          // Application Insights settings are always included
+          APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.outputs.connectionString
+          APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'Authorization=AAD'
+        }
+      }
+    ]
+  }
+}
+
+// Consolidated Role Assignments
+module rbacAssignments 'modules/rbac.functions.bicep' = {
+  name: 'rbacAssignments'
+  scope: rg
+  params: {
+    storageAccountName: storageFunction.outputs.name
+    appInsightsName: applicationInsights.outputs.name
+    managedIdentityPrincipalId: functionApp.outputs.?systemAssignedMIPrincipalId ?? ''
+    userIdentityPrincipalId: principalId
+    allowUserIdentityPrincipal: !empty(principalId)
+  }
+}
+
+// End Function
 
 module aisearch 'br/public:avm/res/search/search-service:0.11.1' = {
   scope: rg
