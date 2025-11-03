@@ -5,12 +5,23 @@ class Jurisdiction(BaseModel):
     region:Optional[str] = None
     clause:Optional[str] = None
 
+class Party(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    reference_name: Optional[str] = Field(default=None, alias="referenceName")
+    clause: Optional[str] = None
+
 # Extracted from Document Intelligence
 class ContractFields(BaseModel):
     doc_type:Optional[str] = Field(default=None,alias="docType")
     title:Optional[str] = None
+    contract_id: Optional[str] = Field(default=None, alias="contractId")
+    parties:List[Party] = []
+    execution_date: Optional[str] = Field(default=None, alias="executionDate")
     effective_date:Optional[str] = Field(default=None,alias="effectiveDate")
-    parties:List[str] = []
+    expiration_date: Optional[str] = Field(default=None, alias="expirationDate")
+    contract_duration: Optional[str] = Field(default=None, alias="contractDuration")
+    renewal_date: Optional[str] = Field(default=None, alias="renewalDate")
     jurisdictions:List[str] = []
 
 class Message(BaseModel):

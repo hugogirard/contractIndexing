@@ -2,7 +2,7 @@ from azure.functions import HttpMethod
 from request import DocumentRequest, DocumentOutput
 from pydantic import ValidationError
 from services.contract_service import ContractService
-from models import ContractFields, Contract
+from models import ContractFields, Contract, Message
 import azure.functions as func
 import logging
 import json
@@ -23,14 +23,27 @@ async def process_contract(req: func.HttpRequest) -> func.HttpResponse:
         document_output = DocumentOutput(values=[])
 
         for doc in document_request.values:
-            contract_fields:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
-            
-            contract = Contract(
-                recordId=doc.recordId,
-                data=contract_fields
-            )
-            
-            document_output.values.append(contract)
+
+            try:
+                contract_fields:ContractFields = await contract_service.analyze_contract(file_name=doc.blob_metadata_data.metadata_storage_name)
+                
+                contract = Contract(
+                    recordId=doc.recordId,
+                    data=contract_fields
+                )
+                
+                document_output.values.append(contract)
+            except Exception as ex:
+                # Keeping the document in errors
+                contract = Contract(
+                    recordId=doc.recordId,
+                    errors=Message(
+                        message=str(ex)
+                    )
+                )
+                document_output.values.append(contract)
+
+
             
         return func.HttpResponse(document_output.model_dump_json(indent=4, by_alias=True),
                                  status_code=200)
