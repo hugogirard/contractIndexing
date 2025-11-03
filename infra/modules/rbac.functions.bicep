@@ -42,7 +42,7 @@ module storageRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assi
 }
 
 module storageRoleAssignmentDocument 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
-  name: 'storageRoleAssignment-${uniqueString(storageAccountFunction.id, userManagedIdentity)}'
+  name: 'storageRoleAssignmentDocument-${uniqueString(storageAccountFunction.id, userManagedIdentity)}'
   params: {
     resourceId: storageAccountDocument.id
     roleDefinitionId: roleDefinitions.storageBlobDataOwner
