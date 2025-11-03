@@ -2,7 +2,8 @@
 // This module assigns the necessary permissions for the Function App's system-assigned managed identity
 // and optionally for a user identity for development/testing scenarios
 
-param storageAccountName string
+param storageAccountFunctionName string
+param storageAccountDocumentName string
 param appInsightsName string
 param userManagedIdentity string // Principal ID for the System-Assigned Managed Identity
 
@@ -15,8 +16,12 @@ var roleDefinitions = {
 }
 
 // Reference existing resources
-resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
-  name: storageAccountName
+resource storageAccountFunction 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+  name: storageAccountFunctionName
+}
+
+resource storageAccountDocument 'Microsoft.Storage/storageAccounts@2022-09-01' existing = {
+  name: storageAccountDocumentName
 }
 
 resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing = {
@@ -25,9 +30,21 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing
 
 // Storage Account - Blob Data Owner Role Assignment (System-Assigned Managed Identity)
 module storageRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
-  name: 'storageRoleAssignment-${uniqueString(storageAccount.id, userManagedIdentity)}'
+  name: 'storageRoleAssignment-${uniqueString(storageAccountFunction.id, userManagedIdentity)}'
   params: {
-    resourceId: storageAccount.id
+    resourceId: storageAccountFunction.id
+    roleDefinitionId: roleDefinitions.storageBlobDataOwner
+    principalId: userManagedIdentity
+    principalType: 'ServicePrincipal'
+    description: 'Storage Blob Data Owner role for Function App system-assigned managed identity'
+    roleName: 'Storage Blob Data Owner'
+  }
+}
+
+module storageRoleAssignmentDocument 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
+  name: 'storageRoleAssignment-${uniqueString(storageAccountFunction.id, userManagedIdentity)}'
+  params: {
+    resourceId: storageAccountDocument.id
     roleDefinitionId: roleDefinitions.storageBlobDataOwner
     principalId: userManagedIdentity
     principalType: 'ServicePrincipal'
@@ -38,9 +55,9 @@ module storageRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assi
 
 // Storage Account - Queue Data Contributor Role Assignment (System-Assigned Managed Identity)
 module queueRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
-  name: 'queueRoleAssignment-${uniqueString(storageAccount.id, userManagedIdentity)}'
+  name: 'queueRoleAssignment-${uniqueString(storageAccountFunction.id, userManagedIdentity)}'
   params: {
-    resourceId: storageAccount.id
+    resourceId: storageAccountFunction.id
     roleDefinitionId: roleDefinitions.storageQueueDataContributor
     principalId: userManagedIdentity
     principalType: 'ServicePrincipal'
@@ -51,9 +68,9 @@ module queueRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assign
 
 // Storage Account - Table Data Contributor Role Assignment (System-Assigned Managed Identity)
 module tableRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
-  name: 'tableRoleAssignment-${uniqueString(storageAccount.id, userManagedIdentity)}'
+  name: 'tableRoleAssignment-${uniqueString(storageAccountFunction.id, userManagedIdentity)}'
   params: {
-    resourceId: storageAccount.id
+    resourceId: storageAccountFunction.id
     roleDefinitionId: roleDefinitions.storageTableDataContributor
     principalId: userManagedIdentity
     principalType: 'ServicePrincipal'

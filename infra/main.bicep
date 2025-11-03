@@ -43,141 +43,15 @@ module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
 
 // Functions and dependencies
 
-var functionAppName = 'funcskill-${suffix}'
-var deploymentStorageContainerName = 'app-package-${take(functionAppName, 32)}-${take(suffix, 7)}'
-
-module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.2' = {
-  scope: rg
-  params: {
-    name: 'func-${suffix}'
-  }
-}
-
-module logAnalytics 'br/public:avm/res/operational-insights/workspace:0.11.1' = {
-  scope: rg
-  params: {
-    name: 'log-${suffix}'
-    location: location
-    dataRetention: 30
-  }
-}
-
-module applicationInsights 'br/public:avm/res/insights/component:0.6.0' = {
-  name: '${uniqueString(deployment().name, location)}-appinsights'
-  scope: rg
-  params: {
-    name: 'appli-${suffix}'
-    location: location
-    workspaceResourceId: logAnalytics.outputs.resourceId
-    disableLocalAuth: true
-  }
-}
-
-module storageFunction 'br/public:avm/res/storage/storage-account:0.25.0' = {
-  name: 'storage'
-  scope: rg
-  params: {
-    name: 'strf${replace(suffix,'-','')}'
-    allowBlobPublicAccess: false
-    allowSharedKeyAccess: false
-    dnsEndpointType: 'Standard'
-    publicNetworkAccess: 'Enabled'
-    networkAcls: {
-      defaultAction: 'Allow'
-      bypass: 'AzureServices'
-    }
-    blobServices: {
-      containers: [{ name: deploymentStorageContainerName }]
-    }
-    tableServices: {}
-    queueServices: {}
-    minimumTlsVersion: 'TLS1_2' // Enforcing TLS 1.2 for better security
-    location: location
-    tags: {
-      SecurityControl: 'Ignore'
-    }
-  }
-}
-
-module appServicePlan 'br/public:avm/res/web/serverfarm:0.1.1' = {
-  name: 'appserviceplan'
-  scope: rg
-  params: {
-    name: 'asp-${suffix}'
-    sku: {
-      name: 'FC1'
-      tier: 'FlexConsumption'
-    }
-    reserved: true
-    location: location
-    zoneRedundant: false
-  }
-}
-
-module functionApp 'br/public:avm/res/web/site:0.16.0' = {
-  name: 'functionapp'
-  scope: rg
-  params: {
-    kind: 'functionapp,linux'
-    name: functionAppName
-    location: location
-    serverFarmResourceId: appServicePlan.outputs.resourceId
-    managedIdentities: {
-      userAssignedResourceIds: [
-        userAssignedIdentity.outputs.resourceId
-      ]
-    }
-    functionAppConfig: {
-      deployment: {
-        storage: {
-          type: 'blobContainer'
-          value: '${storageFunction.outputs.primaryBlobEndpoint}${deploymentStorageContainerName}'
-          authentication: {
-            type: 'UserAssignedIdentity'
-            userAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
-          }
-        }
-      }
-      scaleAndConcurrency: {
-        maximumInstanceCount: 100
-        instanceMemoryMB: 2048
-      }
-      runtime: {
-        name: 'python'
-        version: '3.11'
-      }
-    }
-    siteConfig: {
-      alwaysOn: false
-    }
-    configs: [
-      {
-        name: 'appsettings'
-        properties: {
-          // Only include required credential settings unconditionally
-          AzureWebJobsStorage__clientId: userAssignedIdentity.outputs.clientId
-          AzureWebJobsStorage__credential: 'managedidentity'
-          AzureWebJobsStorage__blobServiceUri: 'https://${storageFunction.outputs.name}.blob.${environment().suffixes.storage}'
-          AzureWebJobsStorage__queueServiceUri: 'https://${storageFunction.outputs.name}.queue.${environment().suffixes.storage}'
-          AzureWebJobsStorage__tableServiceUri: 'https://${storageFunction.outputs.name}.table.${environment().suffixes.storage}'
-
-          // Application Insights settings are always included
-          APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.outputs.connectionString
-          APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${userAssignedIdentity.outputs.clientId};Authorization=AAD'
-        }
-      }
-    ]
-  }
-}
-
 // Consolidated Role Assignments
-module rbacAssignments 'modules/rbac.functions.bicep' = {
-  name: 'rbacAssignments'
+
+module functions 'modules/functions.bicep' = {
   scope: rg
   params: {
-    storageAccountName: storageFunction.outputs.name
-    appInsightsName: applicationInsights.outputs.name
-    userManagedIdentity: userAssignedIdentity.outputs.principalId ?? ''
+    location: location
+    docIntelligenceResourceName: doc.outputs.resourceName
+    suffix: suffix
+    storageUploadDocumentResourceName: storage.outputs.name
   }
 }
 
@@ -241,4 +115,4 @@ module doc_aiSearch_storage_contributor 'br/public:avm/ptn/authorization/resourc
   }
 }
 
-output functionAppName string = functionApp.outputs.name
+output functionAppName string = functions.outputs.functionAppResourceName

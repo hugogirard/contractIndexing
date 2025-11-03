@@ -24,3 +24,4 @@ resource doc 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
 }
 
 output systemAssignedMIPrincipalId string = doc.identity.principalId
+output resourceName string = doc.name
