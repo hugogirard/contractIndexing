@@ -127,7 +127,7 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
     serverFarmResourceId: appServicePlan.outputs.resourceId
     managedIdentities: {
       userAssignedResourceIds: [
-        '${userAssignedIdentity.outputs.clientId}'
+        userAssignedIdentity.outputs.resourceId
       ]
     }
     functionAppConfig: {
@@ -136,7 +136,8 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
           type: 'blobContainer'
           value: '${storage.outputs.primaryBlobEndpoint}${deploymentStorageContainerName}'
           authentication: {
-            type: 'SystemAssignedIdentity'
+            type: 'UserAssignedIdentity'
+            userAssignedIdentityResourceId: userAssignedIdentity.outputs.resourceId
           }
         }
       }
