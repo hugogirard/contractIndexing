@@ -49,6 +49,13 @@ module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
 var functionAppName = 'funcskill-${suffix}'
 var deploymentStorageContainerName = 'app-package-${take(functionAppName, 32)}-${take(suffix, 7)}'
 
+module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.4.2' = {
+  scope: rg
+  params: {
+    name: 'func-${suffix}'
+  }
+}
+
 module logAnalytics 'br/public:avm/res/operational-insights/workspace:0.11.1' = {
   scope: rg
   params: {
@@ -119,7 +126,9 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
     location: location
     serverFarmResourceId: appServicePlan.outputs.resourceId
     managedIdentities: {
-      systemAssigned: true
+      userAssignedResourceIds: [
+        '${userAssignedIdentity.outputs.clientId}'
+      ]
     }
     functionAppConfig: {
       deployment: {
@@ -148,6 +157,7 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
         name: 'appsettings'
         properties: {
           // Only include required credential settings unconditionally
+          AzureWebJobsStorage__clientId: userAssignedIdentity.outputs.clientId
           AzureWebJobsStorage__credential: 'managedidentity'
           AzureWebJobsStorage__blobServiceUri: 'https://${storage.outputs.name}.blob.${environment().suffixes.storage}'
           AzureWebJobsStorage__queueServiceUri: 'https://${storage.outputs.name}.queue.${environment().suffixes.storage}'
@@ -155,7 +165,7 @@ module functionApp 'br/public:avm/res/web/site:0.16.0' = {
 
           // Application Insights settings are always included
           APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsights.outputs.connectionString
-          APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'Authorization=AAD'
+          APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${userAssignedIdentity.outputs.clientId};Authorization=AAD'
         }
       }
     ]
@@ -169,7 +179,7 @@ module rbacAssignments 'modules/rbac.functions.bicep' = {
   params: {
     storageAccountName: storageFunction.outputs.name
     appInsightsName: applicationInsights.outputs.name
-    managedIdentityPrincipalId: functionApp.outputs.?systemAssignedMIPrincipalId ?? ''
+    managedIdentityPrincipalId: userAssignedIdentity.outputs.clientId ?? ''
     userIdentityPrincipalId: principalId
     allowUserIdentityPrincipal: !empty(principalId)
   }
