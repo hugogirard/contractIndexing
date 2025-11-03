@@ -180,9 +180,7 @@ module rbacAssignments 'modules/rbac.functions.bicep' = {
   params: {
     storageAccountName: storageFunction.outputs.name
     appInsightsName: applicationInsights.outputs.name
-    managedIdentityPrincipalId: userAssignedIdentity.outputs.clientId ?? ''
-    userIdentityPrincipalId: principalId
-    allowUserIdentityPrincipal: !empty(principalId)
+    userManagedIdentity: userAssignedIdentity.outputs.principalId ?? ''
   }
 }
 

@@ -4,9 +4,7 @@
 
 param storageAccountName string
 param appInsightsName string
-param managedIdentityPrincipalId string // Principal ID for the System-Assigned Managed Identity
-param userIdentityPrincipalId string = '' // Principal ID for the User Identity
-param allowUserIdentityPrincipal bool = false // Flag to enable user identity role assignments
+param userManagedIdentity string // Principal ID for the System-Assigned Managed Identity
 
 // Define Role Definition IDs for Azure built-in roles
 var roleDefinitions = {
@@ -26,105 +24,53 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' existing
 }
 
 // Storage Account - Blob Data Owner Role Assignment (System-Assigned Managed Identity)
-module storageRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(managedIdentityPrincipalId)) {
-  name: 'storageRoleAssignment-${uniqueString(storageAccount.id, managedIdentityPrincipalId)}'
+module storageRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
+  name: 'storageRoleAssignment-${uniqueString(storageAccount.id, userManagedIdentity)}'
   params: {
     resourceId: storageAccount.id
     roleDefinitionId: roleDefinitions.storageBlobDataOwner
-    principalId: managedIdentityPrincipalId
+    principalId: userManagedIdentity
     principalType: 'ServicePrincipal'
     description: 'Storage Blob Data Owner role for Function App system-assigned managed identity'
     roleName: 'Storage Blob Data Owner'
   }
 }
 
-// Storage Account - Blob Data Owner Role Assignment (User Identity)
-module storageRoleAssignment_User 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
-  name: 'storageRoleAssignment-User-${uniqueString(storageAccount.id, userIdentityPrincipalId)}'
-  params: {
-    resourceId: storageAccount.id
-    roleDefinitionId: roleDefinitions.storageBlobDataOwner
-    principalId: userIdentityPrincipalId
-    principalType: 'User'
-    description: 'Storage Blob Data Owner role for user identity (development/testing)'
-    roleName: 'Storage Blob Data Owner'
-  }
-}
-
 // Storage Account - Queue Data Contributor Role Assignment (System-Assigned Managed Identity)
-module queueRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(managedIdentityPrincipalId)) {
-  name: 'queueRoleAssignment-${uniqueString(storageAccount.id, managedIdentityPrincipalId)}'
+module queueRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
+  name: 'queueRoleAssignment-${uniqueString(storageAccount.id, userManagedIdentity)}'
   params: {
     resourceId: storageAccount.id
     roleDefinitionId: roleDefinitions.storageQueueDataContributor
-    principalId: managedIdentityPrincipalId
+    principalId: userManagedIdentity
     principalType: 'ServicePrincipal'
     description: 'Storage Queue Data Contributor role for Function App system-assigned managed identity'
     roleName: 'Storage Queue Data Contributor'
   }
 }
 
-// Storage Account - Queue Data Contributor Role Assignment (User Identity)
-module queueRoleAssignment_User 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
-  name: 'queueRoleAssignment-User-${uniqueString(storageAccount.id, userIdentityPrincipalId)}'
-  params: {
-    resourceId: storageAccount.id
-    roleDefinitionId: roleDefinitions.storageQueueDataContributor
-    principalId: userIdentityPrincipalId
-    principalType: 'User'
-    description: 'Storage Queue Data Contributor role for user identity (development/testing)'
-    roleName: 'Storage Queue Data Contributor'
-  }
-}
-
 // Storage Account - Table Data Contributor Role Assignment (System-Assigned Managed Identity)
-module tableRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(managedIdentityPrincipalId)) {
-  name: 'tableRoleAssignment-${uniqueString(storageAccount.id, managedIdentityPrincipalId)}'
+module tableRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
+  name: 'tableRoleAssignment-${uniqueString(storageAccount.id, userManagedIdentity)}'
   params: {
     resourceId: storageAccount.id
     roleDefinitionId: roleDefinitions.storageTableDataContributor
-    principalId: managedIdentityPrincipalId
+    principalId: userManagedIdentity
     principalType: 'ServicePrincipal'
     description: 'Storage Table Data Contributor role for Function App system-assigned managed identity'
     roleName: 'Storage Table Data Contributor'
   }
 }
 
-// Storage Account - Table Data Contributor Role Assignment (User Identity)
-module tableRoleAssignment_User 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
-  name: 'tableRoleAssignment-User-${uniqueString(storageAccount.id, userIdentityPrincipalId)}'
-  params: {
-    resourceId: storageAccount.id
-    roleDefinitionId: roleDefinitions.storageTableDataContributor
-    principalId: userIdentityPrincipalId
-    principalType: 'User'
-    description: 'Storage Table Data Contributor role for user identity (development/testing)'
-    roleName: 'Storage Table Data Contributor'
-  }
-}
-
 // Application Insights - Monitoring Metrics Publisher Role Assignment (System-Assigned Managed Identity)
-module appInsightsRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(managedIdentityPrincipalId)) {
-  name: 'appInsightsRoleAssignment-${uniqueString(applicationInsights.id, managedIdentityPrincipalId)}'
+module appInsightsRoleAssignment 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (!empty(userManagedIdentity)) {
+  name: 'appInsightsRoleAssignment-${uniqueString(applicationInsights.id, userManagedIdentity)}'
   params: {
     resourceId: applicationInsights.id
     roleDefinitionId: roleDefinitions.monitoringMetricsPublisher
-    principalId: managedIdentityPrincipalId
+    principalId: userManagedIdentity
     principalType: 'ServicePrincipal'
     description: 'Monitoring Metrics Publisher role for Function App system-assigned managed identity'
-    roleName: 'Monitoring Metrics Publisher'
-  }
-}
-
-// Application Insights - Monitoring Metrics Publisher Role Assignment (User Identity)
-module appInsightsRoleAssignment_User 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.2' = if (allowUserIdentityPrincipal && !empty(userIdentityPrincipalId)) {
-  name: 'appInsightsRoleAssignment-User-${uniqueString(applicationInsights.id, userIdentityPrincipalId)}'
-  params: {
-    resourceId: applicationInsights.id
-    roleDefinitionId: roleDefinitions.monitoringMetricsPublisher
-    principalId: userIdentityPrincipalId
-    principalType: 'User'
-    description: 'Monitoring Metrics Publisher role for user identity (development/testing)'
     roleName: 'Monitoring Metrics Publisher'
   }
 }
