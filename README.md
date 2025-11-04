@@ -90,7 +90,8 @@ contractIndexing/
 │   └── skillset.json              # Custom skill definition
 └── .github/
     └── workflows/
-        └── infrastructure.yml     # GitHub Actions workflow
+        ├── infrastructure.yml     # GitHub Actions - Deploy Azure resources
+        └── functions.yml          # GitHub Actions - Deploy Function App
 ```
 
 ## 🔑 Key Components
@@ -140,183 +141,358 @@ cd contractIndexing
 
 Before deploying infrastructure, you need to set up GitHub secrets for authentication.
 
+#### Create Azure Service Principal
+
+First, create a service principal with Owner role on your subscription:
+
+```bash
+# Login to Azure
+az login
+
+# Set your subscription (replace with your subscription ID)
+az account set --subscription "<your-subscription-id>"
+
+# Create service principal with Owner role
+az ad sp create-for-rbac \
+  --name "github-actions-contractindexing" \
+  --role owner \
+  --scopes /subscriptions/<your-subscription-id> \
+  --sdk-auth
+```
+
+This command will output JSON credentials that look like this:
+
+```json
+{
+  "clientId": "00000000-0000-0000-0000-000000000000",
+  "clientSecret": "your-client-secret-here",
+  "subscriptionId": "00000000-0000-0000-0000-000000000000",
+  "tenantId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+**Important**: Copy this entire JSON output keeping the same structure than above - you'll need it for the GitHub secret.
+
+> **Note**: The service principal requires **Owner** role to properly assign RBAC permissions for managed identities during deployment.
+
+#### Add Secrets to GitHub
+
 Go to your GitHub repository → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
 Create the following secrets:
 
-1. **AZURE_CREDENTIALS**: Azure service principal credentials with **Owner** role (JSON format with clientId, clientSecret, subscriptionId, tenantId)
-2. **AZURE_SUBSCRIPTION**: Your Azure subscription ID (GUID format)
+1. **AZURE_CREDENTIALS**: Paste the entire JSON output from the service principal creation command above
+2. **AZURE_SUBSCRIPTION**: Your Azure subscription ID (GUID format, e.g., `00000000-0000-0000-0000-000000000000`)
 
-> **Note**: The service principal requires **Owner** role to properly assign RBAC permissions for managed identities during deployment.
+Example for `AZURE_SUBSCRIPTION`:
+```
+12345678-1234-1234-1234-123456789012
+```
 
 ### Step 3: Deploy Azure Infrastructure via GitHub Actions
 
-The infrastructure deployment is automated using GitHub Actions workflow.
+The infrastructure deployment is fully automated using the GitHub Actions workflow located at `.github/workflows/infrastructure.yml`.
 
-#### Option A: Automatic Deployment (Recommended)
+#### What Gets Deployed
 
-The workflow automatically runs when you push changes to Bicep files:
+The infrastructure deployment creates the following Azure resources:
 
-```bash
-# Make a change to any Bicep file or simply trigger a re-run
-git add infra/
-git commit -m "Deploy infrastructure"
-git push
-```
+- **Resource Group**: Container for all resources
+- **Azure Storage Account**: Stores contract PDFs in the `documents` container
+- **Azure Document Intelligence**: Prebuilt contract model for field extraction
+- **Azure Function App**: Flex Consumption plan with Python 3.11 runtime
+- **Azure AI Search**: Search service with datasource, index, indexer, and skillset (created manually after infrastructure)
+- **Managed Identities**: System-assigned identity for Function App with proper RBAC permissions
+- **Application Insights**: Monitoring and logging for the Function App
 
-#### Option B: Manual Deployment
+> **⚠️ Important - Deployment Region**: By default, all Azure resources will be deployed to the **Canada Central** region. If you need to deploy to a different region, please see the [Deployment Configuration](#deployment-configuration) section below **before** running the workflow.
+
+#### Trigger the Deployment
 
 1. Go to your GitHub repository
-2. Navigate to **Actions** tab
-3. Select **"Create Azure Resources"** workflow
-4. Click **"Run workflow"** button
+2. Click on **Actions** tab
+3. Select **Create Azure Resources** workflow
+4. Click **Run workflow** button
 5. Select the branch (usually `main`)
-6. Click **"Run workflow"**
+6. Click **Run workflow**
 
-The workflow will:
-- ✅ Deploy Resource Group
-- ✅ Deploy Azure Storage Account (for documents and function storage)
-- ✅ Deploy Azure Document Intelligence (Form Recognizer)
-- ✅ Deploy Azure Function App (Flex Consumption plan)
-- ✅ Deploy Application Insights
-- ✅ Deploy Log Analytics Workspace
+#### Monitor the Deployment
 
-**Note**: The deployment takes approximately 5-10 minutes. You can monitor progress in the Actions tab.
+1. In the **Actions** tab, click on the running workflow
+2. Click on the **create-azure-resources** job to see detailed logs
+3. The deployment typically takes 5-10 minutes
+4. Upon successful completion, you'll see:
+   - All Azure resources created
+   - Output values captured (Function App name)
+   - GitHub secret `FUNCTION_APP_NAME` automatically created for the next step
 
-#### Verify Deployment
+#### Deployment Configuration
 
-After successful deployment, verify resources were created:
-1. Go to [Azure Portal](https://portal.azure.com)
-2. Navigate to resource group `rg-contract-analyzer-tmplt`
-3. Verify the following resources exist:
-   - Storage Account (str{suffix})
-   - Document Intelligence (doc-{suffix})
-   - Function App (funcskill-{suffix})
-   - Application Insights
-   - Log Analytics Workspace
+The deployment can be customized by editing `infra/main.bicepparam`:
 
-### Step 4: Generate Sample Contracts
+```bicep
+using 'main.bicep'
 
-```bash
-cd ../dataGenerator
-
-# Install dependencies
-pip install -e .
-
-# Generate contracts (default: 20 contracts)
-python main.py
-
-# Or specify number of contracts
-python main.py --count 50
+param location = 'canadacentral'  // Change to your preferred region
+param rgName = 'rg-contract-analyzer-tmplt' // Change to your preferred name
 ```
 
-This creates PDFs in `generated_contracts/` directory.
+**Important**: The GitHub Actions workflow deploys to `canadacentral` by default.
 
-### Step 5: Upload Contracts to Azure Blob Storage
+### Step 4: Deploy Azure Functions via GitHub Actions
 
-1. Go to [Azure Portal](https://portal.azure.com)
-2. Navigate to your resource group `rg-contract-analyzer-tmplt`
-3. Open the Storage Account (str{suffix})
-4. Go to **Containers** → **documents**
-5. Click **Upload** and select all PDF files from the `generated_contracts/` folder
-6. Wait for the upload to complete
+After the infrastructure is deployed, you need to deploy the Azure Functions code that acts as the custom Web API skill.
+
+#### What Gets Deployed
+
+The Function App deployment includes:
+
+- **Python Function Code**: HTTP-triggered function (`function_app.py`)
+- **Dependencies**: All packages from `requirements.txt`
+- **Pydantic Models**: Contract, Party, and Date models for structured data
+- **Services**: Contract processing service that calls Document Intelligence
+- **Configuration**: Automatically uses managed identity for authentication
+
+#### Trigger the Deployment
+
+1. Ensure the infrastructure deployment completed successfully (Step 3)
+2. Go to your GitHub repository → **Actions** tab
+3. Select **Deploy Skillsets to Azure Function App** workflow
+4. Click **Run workflow** button
+5. Select the branch (usually `main`)
+6. Click **Run workflow**
+
+The workflow will:
+1. Checkout the repository code
+2. Set up Python 3.11 environment
+3. Install dependencies from `requirements.txt`
+4. Package the function code
+5. Deploy to the Function App using managed identity authentication
+6. Enable Oryx build for optimized deployment
+
+#### Monitor the Deployment
+
+1. Watch the workflow progress in the **Actions** tab
+2. The deployment typically takes 3-5 minutes
+
+#### Verify Function Deployment
+
+After deployment, test the function:
+
+1. **Via Azure Portal**:
+   - Navigate to your Function App
+   - Go to **Functions** → **analyze_contract**
+   - Click **Get Function Url** and copy the URL with the code parameter
+   - Copy the **default (Function Key)**
+
+### Step 5: Generate and Upload Contracts for Indexing
+
+Now that the infrastructure and functions are deployed, you can generate sample contracts and upload them to be processed by the AI Search pipeline.
+
+#### Understanding the Data Generator
+
+The data generator (`src/dataGenerator/main.py`) creates realistic contract PDFs with:
+
+- **Multiple Contract Types**: Web hosting, cloud services, software licensing, maintenance agreements, data processing agreements
+- **Realistic Parties**: Various fictional companies (Contoso, Fabrikam, Northwind, Fourth Coffee, Woodgrove Bank)
+- **Random Dates**: Contract execution, effective, expiration, and renewal dates
+- **Jurisdictions**: Different US states for governing law
+- **Professional Formatting**: Colored headers, styled sections, tables, and signatures
+
+#### Generate Contract PDFs
+
+1. **Navigate to the data generator directory**:
+   ```bash
+   cd src/dataGenerator
+   ```
+
+2. **Install dependencies** (first time only):
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Run the generator**:
+   ```bash
+   python main.py
+   ```
+
+   This will create 10 sample contract PDFs in the `generated_contracts/` folder with names.  You will need to upload them in the Azure Storage.
+
+#### Upload Contracts to Azure Blob Storage
+
+You have two options to upload the generated contracts:
+
+1. Open [Azure Portal](https://portal.azure.com)
+2. Navigate to your Storage Account (e.g., `strl<unique-id>`)
+3. Go to **Containers** → **documents**
+4. Click **Upload**
+5. Select all PDFs from `src/dataGenerator/generated_contracts/`
+6. Click **Upload**
 
 ### Step 6: Configure Azure AI Search
 
-#### Create Azure AI Search Service
+Now that contracts are uploaded to blob storage, you need to configure Azure AI Search to create the complete indexing pipeline. This involves creating four components in order: Data Source, Index, Skillset, and Indexer.
 
-1. In Azure Portal, create a new **Azure AI Search** service
-2. Choose the same resource group: `rg-contract-analyzer-tmplt`
-3. Select pricing tier (Basic or Standard recommended)
-4. Wait for deployment to complete
+#### 6.1 Create the Data Source
 
-#### Update Configuration Files
+The data source connects Azure AI Search to your blob storage container.
 
-Before creating search resources, update the following configuration files:
+1. **Get your Storage Account Resource ID**:
+   - Go to [Azure Portal](https://portal.azure.com)
+   - Navigate to your Storage Account (named `strl<unique-id>`)
+   - In the left menu, click **Endpoints**
+   - Copy the **Storage account resource ID** (it looks like `/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.Storage/storageAccounts/strlxxx`)
 
-**1. Update `aiSearchConfig/datasource.json`:**
-   - Replace the `connectionString` value with your storage account resource ID:
-     ```json
-     "connectionString": "ResourceId=/subscriptions/{YOUR-SUBSCRIPTION-ID}/resourceGroups/rg-contract-analyzer-tmplt/providers/Microsoft.Storage/storageAccounts/{YOUR-STORAGE-ACCOUNT-NAME};"
+2. **Update the datasource.json file**:
+   - Open `aiSearchConfig/datasource.json` from your local repository
+   - Locate the `connectionString` field
+   - Replace it with your Storage Account Resource ID in this format:
      ```
-
-**2. Update `aiSearchConfig/skillset.json`:**
-   - Replace `__functionUrl__` with your Azure Function URL:
-     ```json
-     "uri": "https://funcskill-{suffix}.azurewebsites.net/api/process?code={function-key}"
+     "connectionString": "ResourceId=/subscriptions/xxx/resourceGroups/xxx/providers/Microsoft.Storage/storageAccounts/strlxxx;"
      ```
-   - To get the Function URL:
-     - Go to Function App in Azure Portal
-     - Navigate to **Functions** → **process** → **Get Function URL**
+   - ⚠️ **Important**: Add `ResourceId=` at the beginning and `;` at the end
 
-#### Create Search Resources in Azure Portal
+   **Example of complete datasource.json**:
+   ```json
+   {
+       "name": "dtidx",
+       "description": "Blob storage data source for contract documents",
+       "type": "azureblob",
+       "credentials": {
+           "connectionString": "ResourceId=/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/rg-contract-analyzer-tmplt/providers/Microsoft.Storage/storageAccounts/strl2d92a;"
+       },
+       "container": {
+           "name": "documents"
+       }
+   }
+   ```
 
-1. **Create Data Source:**
-   - Go to your Azure AI Search service
-   - Navigate to **Data sources** → **Add data source**
-   - Name: `dtidx`
-   - Data source type: **Azure Blob Storage**
-   - Connection string: Use managed identity or your storage account
-   - Container: `documents`
+3. **Create the data source in Azure**:
+   - In Azure Portal, navigate to your **Azure AI Search** service
+   - Click **Data sources** in the left menu
+   - Click **+ Add data source**
+   - Select **Add data source (JSON)**
+   - Paste the entire content of your updated `datasource.json` file
+   - Click **Save**
 
-2. **Create Index:**
-   - Navigate to **Indexes** → **Add index**
-   - Use the schema from `aiSearchConfig/index.json`
-   - Index name: `contract`
+#### 6.2 Create the Index
 
-3. **Create Skillset:**
-   - Navigate to **Skillsets** → **Add skillset**
-   - Name: `contractskillset`
-   - Use configuration from `aiSearchConfig/skillset.json`
+The index defines the schema for your searchable contract data.
 
-4. **Create Indexer:**
-   - Navigate to **Indexers** → **Add indexer**
-   - Name: `indexercontract`
-   - Data source: `dtidx`
-   - Skillset: `contractskillset`
-   - Target index: `contract`
-   - Schedule: Run hourly (PT1H)
-   - Use field mappings from `aiSearchConfig/indexer.json`
+1. **In Azure Portal**, still in your Azure AI Search service:
+   - Click **Indexes** in the left menu
+   - Click **+ Add index**
+   - Select **Add Index (JSON)**
 
-## 📊 Extracted Contract Fields
+2. **Copy the index definition**:
+   - Open `aiSearchConfig/index.json` from your repository
+   - Copy the entire JSON content
+   - Paste it into the Azure Portal
+   - Click **Save**
 
-The solution extracts and indexes the following fields:
+The index includes fields for contract parties, dates, jurisdictions, and other extracted metadata.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| **docType** | String | Document type from Document Intelligence |
-| **title** | String | Contract title (e.g., "WEB HOSTING AGREEMENT") |
-| **contractId** | String | Unique contract identifier |
-| **parties** | Array | Contract parties with name, address, reference name |
-| **executionDate** | String | Date contract was signed |
-| **effectiveDate** | String | Date contract becomes effective |
-| **expirationDate** | String | Contract end date |
-| **contractDuration** | String | Duration in months |
-| **renewalDate** | String | Date for renewal consideration |
-| **jurisdictions** | Array | Governing law jurisdictions and clauses |
+#### 6.3 Create the Skillset
 
-## 🤝 Contributing
+The skillset defines the custom Web API skill that calls your Azure Function to process documents.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. **Get your Function URL**:
+   - If you didn't save it from Step 4, go to your Function App in Azure Portal
+   - Navigate to **Functions** → **analyze_contract**
+   - Click **Get Function Url**
+   - Copy the complete URL (including the `code` parameter)
+   - Example: `https://func-xxx.azurewebsites.net/api/analyze_contract?code=xxx`
 
-## 📄 License
+2. **Update the skillset.json file**:
+   - Open `aiSearchConfig/skillset.json` from your repository
+   - Find the line: `"uri": "__functionUrl__"`
+   - Replace `__functionUrl__` with your actual Function URL (keep the quotes)
+   
+   **Example**:
+   ```json
+   "uri": "https://func-xxx.azurewebsites.net/api/analyze_contract?code=xxx"
+   ```
 
-This project is licensed under the terms specified in the LICENSE file.
+3. **Create the skillset in Azure**:
+   - In Azure Portal, in your Azure AI Search service
+   - Click **Skillsets** in the left menu
+   - Click **+ Add skillset**
+   - Select **Add skillset (JSON)**
+   - Copy the entire content of your updated `skillset.json` file
+   - Paste it into the Azure Portal
+   - Click **Save**
 
-## 🙏 Acknowledgments
+#### 6.4 Create the Indexer
 
-- Built with Azure AI Document Intelligence
-- Uses Azure Verified Modules (AVM) for infrastructure
-- Leverages Azure AI Search custom skills pattern
+The indexer orchestrates the entire pipeline, pulling documents from the data source, running them through the skillset, and populating the index.
 
-## 📚 Additional Resources
+1. **In Azure Portal**, in your Azure AI Search service:
+   - Click **Indexers** in the left menu
+   - Click **+ Add indexer**
+   - Select **Add indexer (JSON)**
 
-- [Azure AI Document Intelligence](https://learn.microsoft.com/azure/ai-services/document-intelligence/)
-- [Azure AI Search Custom Skills](https://learn.microsoft.com/azure/search/cognitive-search-custom-skill-web-api)
-- [Azure Functions Python Developer Guide](https://learn.microsoft.com/azure/azure-functions/functions-reference-python)
-- [Bicep Documentation](https://learn.microsoft.com/azure/azure-resource-manager/bicep/)
+2. **Copy the indexer definition**:
+   - Open `aiSearchConfig/indexer.json` from your repository
+   - Copy the entire JSON content
+   - Paste it into the Azure Portal
+   - Click **Save**
 
----
+#### 6.5 Monitor Indexing Progress
 
-**Author**: Hugo Girard  
-**Repository**: [contractIndexing](https://github.com/hugogirard/contractIndexing)
+Once the indexer is created, it will automatically start processing your documents.
+
+1. **Watch the indexer run**:
+   - In Azure Portal, stay on the **Indexers** page
+   - Click the **Refresh** button periodically
+   - You should see the indexer status change to **In progress**
+
+2. **Check completion**:
+   - After a few minutes, the status should change to **Success**
+   - You should see **10/10** documents successfully indexed (or however many contracts you uploaded)
+   - Click on the indexer name to view detailed execution history
+
+3. **Troubleshooting**:
+   - If the indexer shows errors, click on the indexer to view the execution details
+   - Common issues:
+     - **Function URL incorrect**: Verify the skillset has the correct function URL with code parameter
+     - **Permissions**: Ensure the Function App managed identity has permissions to access Document Intelligence
+     - **Storage connection**: Verify the data source connection string is correct
+
+### Step 7: Query Your Indexed Contracts
+
+Congratulations! Your contract indexing pipeline is now fully operational. You can now search and query your contracts.
+
+#### Query via Azure Portal
+
+1. **Navigate to your Azure AI Search service**
+2. Click **Indexes** in the left menu
+3. Click on your index name
+4. Click **Search explorer** at the top
+5. Try some queries:
+
+**Example queries**:
+
+- **Search all contracts**:
+  ```
+  search=*
+  ```
+
+- **Search by company name**:
+  ```
+  search=Contoso
+  ```
+
+- **Search by contract type**:
+  ```
+  search=hosting
+  ```
+
+- **Filter by execution date**:
+  ```
+  search=*&$filter=executionDate ge 2024-01-01
+  ```
+
+- **Search with specific fields**:
+  ```
+  search=*&$select=contractId,parties,executionDate,contractType
+  ```

@@ -20,7 +20,6 @@ module doc 'modules/docIntelligence.bicep' = {
     suffix: suffix
   }
 }
-
 module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
   scope: rg
   params: {
@@ -31,6 +30,10 @@ module storage 'br/public:avm/res/storage/storage-account:0.27.1' = {
     kind: 'StorageV2'
     location: location
     publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      defaultAction: 'Allow'
+      bypass: 'AzureServices'
+    }
     blobServices: {
       containers: [
         {

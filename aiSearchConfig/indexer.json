@@ -10,7 +10,7 @@
         }
     },
     "schedule": {
-        "interval": "PT1H"
+        "interval": "PT6H"
     },
     "skillsetName": "contractskillset",
     "outputFieldMappings": [
